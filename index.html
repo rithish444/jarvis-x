@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>J.A.R.V.I.S. - Autonomous Mobile AI System</title>
+    <meta name="description" content="Futuristic Iron Man JARVIS AI Agent for Mobile & Web Control">
+    <meta name="theme-color" content="#03101e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="jarvis-app">
+        <!-- TOP HUD BAR -->
+        <header class="hud-header">
+            <div class="brand">
+                <div class="brand-icon"></div>
+                <span class="brand-title">J.A.R.V.I.S.</span>
+                <span class="brand-sub">MARK VII // MOBILE CORE</span>
+            </div>
+
+            <!-- THEME SWITCHER TOOLBAR -->
+            <div class="theme-selector">
+                <button class="theme-pill active" onclick="JarvisApp.setTheme('mark7')">MARK VII</button>
+                <button class="theme-pill" onclick="JarvisApp.setTheme('hulkbuster')">VERONICA</button>
+                <button class="theme-pill" onclick="JarvisApp.setTheme('stealth')">STEALTH</button>
+            </div>
+
+            <!-- VOICE LANGUAGE TOOLBAR (ENGLISH ONLY) -->
+            <div class="lang-selector">
+                <button class="lang-pill active" id="langEnBtn" onclick="JarvisApp.setVoiceLanguage('en')">🇬🇧 ENGLISH CORE</button>
+            </div>
+
+            <div class="system-status">
+                <div class="status-indicator active" id="statusIndicator"></div>
+                <span class="status-text" id="statusText">ONLINE</span>
+                <span class="clock-display" id="clockDisplay">00:00:00</span>
+            </div>
+        </header>
+
+        <!-- MAIN INTERACTIVE SECTION -->
+        <main class="hud-main">
+            <!-- ARC REACTOR VISUALIZER CENTER -->
+            <div class="arc-reactor-container">
+                <div class="arc-ring ring-outer"></div>
+                <div class="arc-ring ring-mid"></div>
+                <canvas id="visualizerCanvas" width="340" height="340"></canvas>
+                <div class="arc-core" id="arcCoreBtn" title="Click to Talk / Activate Voice">
+                    <div class="core-glow"></div>
+                    <div class="core-symbol">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="22"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISUALIZER MODE TOOLBAR -->
+            <div class="vis-mode-toolbar">
+                <button class="v-mode-btn active" id="vArcBtn" onclick="JarvisApp.setVisMode('arc')">Arc Core</button>
+                <button class="v-mode-btn" id="vOscBtn" onclick="JarvisApp.setVisMode('oscilloscope')">Oscilloscope</button>
+                <button class="v-mode-btn" id="vBarsBtn" onclick="JarvisApp.setVisMode('bars')">Spectrum Bars</button>
+            </div>
+
+            <!-- SPEECH / RESPONSE FEEDBACK DISPLAY -->
+            <div class="hud-display-card">
+                <div class="card-header">
+                    <span class="card-tag">// SYSTEM PROTOCOL RESPONSE</span>
+                    <div class="listening-badge" id="listeningBadge">LISTEN</div>
+                </div>
+                <div class="jarvis-response-box" id="jarvisOutput">
+                    "Hey Rithish! J.A.R.V.I.S. is online and ready. What are we doing today, my friend?"
+                </div>
+                <div class="transcript-box" id="transcriptBox">
+                    <span class="transcript-label">User Input:</span> <span id="userSpeechText">Awaiting voice command...</span>
+                </div>
+            </div>
+
+            <!-- COMMAND INPUT CONTROL BAR -->
+            <div class="command-input-bar">
+                <input type="text" id="cmdInput" placeholder="Enter command or type 'Hey Jarvis'..." autocomplete="off">
+                <button id="sendBtn" class="btn-cyan">DISPATCH</button>
+                <button id="micToggleBtn" class="btn-glow" title="Toggle Continuous Listening">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- GRID DASHBOARD BOARDS -->
+            <section class="hud-grid">
+                <!-- CUSTOM VOICE MACROS & SHORTCUTS -->
+                <div class="hud-card">
+                    <div class="card-title">
+                        <span>⚡ CUSTOM VOICE MACROS</span>
+                        <button class="btn-small" onclick="JarvisApp.toggleMacroBuilder()">+ NEW MACRO</button>
+                    </div>
+                    
+                    <!-- MACRO BUILDER FORM -->
+                    <div class="macro-builder-form" id="macroBuilderForm">
+                        <div class="macro-input-row">
+                            <input type="text" id="macroTriggerInput" placeholder="Trigger Phrase (e.g. 'turbo mode')">
+                        </div>
+                        <div class="macro-input-row">
+                            <select id="macroThemeSelect">
+                                <option value="mark7">Theme: Mark VII Cyan</option>
+                                <option value="hulkbuster">Theme: Veronica Red Alert</option>
+                                <option value="stealth">Theme: Stealth Green</option>
+                            </select>
+                            <select id="macroSfxSelect">
+                                <option value="powerup">SFX: Power-Up Chime</option>
+                                <option value="alert">SFX: Alarm Siren</option>
+                                <option value="blip">SFX: High-Tech Blip</option>
+                            </select>
+                        </div>
+                        <div class="macro-input-row">
+                            <input type="text" id="macroSpeechInput" placeholder="JARVIS Spoken Response">
+                        </div>
+                        <div class="macro-input-row">
+                            <select id="macroDeviceSelect">
+                                <option value="vibrate">Device: Pulse Haptic Vibration</option>
+                                <option value="battery">Device: Battery Telemetry</option>
+                                <option value="location">Device: GPS Location</option>
+                                <option value="camera">Device: Optic Snapshot</option>
+                            </select>
+                            <button class="btn-cyan" onclick="JarvisApp.saveCustomMacro()">SAVE MACRO</button>
+                        </div>
+                    </div>
+
+                    <div class="macros-list" id="macrosList">
+                        <!-- Dynamic Macros rendered here -->
+                    </div>
+                </div>
+
+                <!-- STARK AUTOMATION PROTOCOLS -->
+                <div class="hud-card">
+                    <div class="card-title">STARK AUTOMATION PROTOCOLS</div>
+                    <div class="quick-actions">
+                        <button class="action-btn" onclick="JarvisApp.runProtocol('morning')">☀️ Morning Briefing</button>
+                        <button class="action-btn" onclick="JarvisApp.runProtocol('focus')">🧘 Focus Protocol</button>
+                        <button class="action-btn alert-btn" onclick="JarvisApp.runProtocol('lockdown')">🚨 Lockdown Protocol</button>
+                        <button class="action-btn" onclick="JarvisApp.openVisionModal()">👁️ AI Vision Scanner</button>
+                    </div>
+                </div>
+
+                <!-- MOBILE DEVICE STATS -->
+                <div class="hud-card">
+                    <div class="card-title">MOBILE DIAGNOSTICS</div>
+                    <div class="metrics-list">
+                        <div class="metric-item">
+                            <span class="m-label">BATTERY</span>
+                            <div class="m-bar-bg"><div class="m-bar-fill" id="batteryBar" style="width: 85%;"></div></div>
+                            <span class="m-val" id="batteryVal">85%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="m-label">NETWORK</span>
+                            <span class="m-val highlight" id="networkVal">ONLINE (5G)</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="m-label">LOCATION</span>
+                            <span class="m-val" id="locationVal">ACQUIRING...</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="m-label">NATIVE BRIDGE</span>
+                            <span class="m-val bridge-off" id="bridgeStatus">OFFLINE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MOBILE ACTION MATRIX -->
+                <div class="hud-card">
+                    <div class="card-title">MOBILE ACTION MATRIX</div>
+                    <div class="quick-actions">
+                        <button class="action-btn" onclick="JarvisApp.executeQuickAction('battery')">⚡ Battery Check</button>
+                        <button class="action-btn" onclick="JarvisApp.executeQuickAction('location')">📍 Get Location</button>
+                        <button class="action-btn" onclick="JarvisApp.executeQuickAction('camera')">📷 Snap Photo</button>
+                        <button class="action-btn" onclick="JarvisApp.executeQuickAction('vibrate')">📳 Pulse Haptic</button>
+                        <button class="action-btn" onclick="JarvisApp.executeQuickAction('time')">🕒 System Time</button>
+                        <button class="action-btn" onclick="JarvisApp.executeQuickAction('timer')">⏱️ Quick 10s Timer</button>
+                    </div>
+                </div>
+
+                <!-- ACTIVE TIMERS & ALARMS -->
+                <div class="hud-card">
+                    <div class="card-title">TIMERS & SCHEDULER</div>
+                    <div class="timers-list" id="timersList">
+                        <div class="timer-card-item">
+                            <span>No active timers running</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STARK CONTACT BOOK FOR WHATSAPP -->
+                <div class="hud-card">
+                    <div class="card-title">
+                        <span>📱 STARK CONTACT BOOK</span>
+                        <button class="btn-small" onclick="JarvisApp.toggleContactBuilder()">+ ADD CONTACT</button>
+                    </div>
+
+                    <!-- CONTACT BUILDER FORM -->
+                    <div class="macro-builder-form" id="contactBuilderForm">
+                        <div class="macro-input-row">
+                            <input type="text" id="contactNameInput" placeholder="Contact Name (e.g. 'Rahul', 'Mom')">
+                        </div>
+                        <div class="macro-input-row">
+                            <input type="text" id="contactPhoneInput" placeholder="Phone Number (e.g. '+919876543210')">
+                            <button class="btn-cyan" onclick="JarvisApp.saveContact()">SAVE</button>
+                        </div>
+                    </div>
+
+                    <div class="contacts-list" id="contactsList">
+                        <!-- Dynamic contacts rendered here -->
+                    </div>
+                </div>
+
+                <!-- API CONFIGURATION - INTELLIGENCE CORE -->
+                <div class="hud-card intelligence-core-card">
+                    <div class="card-title">🧠 INTELLIGENCE CORE — AI BRAINS</div>
+
+                    <!-- ACTIVE BRAIN SELECTOR -->
+                    <div class="brain-selector-row">
+                        <label class="brain-select-label">ACTIVE BRAIN SYSTEM</label>
+                        <select id="brainModelSelect" class="hud-select" onchange="JarvisApp.changeActiveBrain(this.value)">
+                            <option value="gemini">⚡ Google Gemini 1.5 Flash</option>
+                            <option value="claude">🔮 Anthropic Claude 3.5 Sonnet</option>
+                            <option value="chatgpt">🤖 OpenAI ChatGPT (GPT-4o-mini)</option>
+                        </select>
+                    </div>
+
+                    <!-- GEMINI BRAIN PANEL -->
+                    <div class="brain-panel" id="brainPanelGemini">
+                        <div class="brain-panel-header gemini-header">
+                            <div class="brain-logo-wrap">
+                                <span class="brain-logo gemini-logo">G</span>
+                                <div>
+                                    <span class="brain-name">Google Gemini</span>
+                                    <span class="brain-model-tag">gemini-1.5-flash</span>
+                                </div>
+                            </div>
+                            <span class="brain-status-badge" id="geminiStatusBadge">STANDBY</span>
+                        </div>
+                        <div class="brain-key-row">
+                            <input type="text" id="geminiKeyInput" class="brain-key-input" placeholder="AIzaSy... (Paste your Gemini API Key)" autocomplete="off">
+                            <button class="btn-eye" onclick="JarvisApp.toggleKeyVisibility('geminiKeyInput', this)" title="Show/Hide">👁</button>
+                        </div>
+                        <div class="brain-key-hint">Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="key-link">aistudio.google.com</a></div>
+                    </div>
+
+                    <!-- CLAUDE BRAIN PANEL -->
+                    <div class="brain-panel" id="brainPanelClaude">
+                        <div class="brain-panel-header claude-header">
+                            <div class="brain-logo-wrap">
+                                <span class="brain-logo claude-logo">C</span>
+                                <div>
+                                    <span class="brain-name">Anthropic Claude</span>
+                                    <span class="brain-model-tag">claude-3-5-sonnet</span>
+                                </div>
+                            </div>
+                            <span class="brain-status-badge" id="claudeStatusBadge">STANDBY</span>
+                        </div>
+                        <div class="brain-key-row">
+                            <input type="text" id="claudeKeyInput" class="brain-key-input" placeholder="sk-ant-... (Paste your Claude API Key)" autocomplete="off">
+                            <button class="btn-eye" onclick="JarvisApp.toggleKeyVisibility('claudeKeyInput', this)" title="Show/Hide">👁</button>
+                        </div>
+                        <div class="brain-key-hint">Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" class="key-link">console.anthropic.com</a></div>
+                    </div>
+
+                    <!-- CHATGPT BRAIN PANEL -->
+                    <div class="brain-panel" id="brainPanelChatgpt">
+                        <div class="brain-panel-header chatgpt-header">
+                            <div class="brain-logo-wrap">
+                                <span class="brain-logo chatgpt-logo">AI</span>
+                                <div>
+                                    <span class="brain-name">OpenAI ChatGPT</span>
+                                    <span class="brain-model-tag">gpt-4o-mini</span>
+                                </div>
+                            </div>
+                            <span class="brain-status-badge" id="chatgptStatusBadge">STANDBY</span>
+                        </div>
+                        <div class="brain-key-row">
+                            <input type="text" id="chatgptKeyInput" class="brain-key-input" placeholder="sk-... (Paste your OpenAI API Key)" autocomplete="off">
+                            <button class="btn-eye" onclick="JarvisApp.toggleKeyVisibility('chatgptKeyInput', this)" title="Show/Hide">👁</button>
+                        </div>
+                        <div class="brain-key-hint">Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" class="key-link">platform.openai.com</a></div>
+                    </div>
+
+                    <div class="config-actions">
+                        <button id="saveKeysBtn" class="btn-full sync-btn">⚡ SYNC & ACTIVATE ALL BRAINS</button>
+                    </div>
+                    <p class="card-note">Paste your API keys above and click SYNC to power the J.A.R.V.I.S. intelligence core. Keys are stored locally on your device only.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- VISION MODAL OVERLAY -->
+        <div class="vision-modal-overlay" id="visionModal">
+            <div class="vision-hud-box">
+                <div class="vision-header">
+                    <span class="vision-title">OPTIC VISION SCANNER // MARK VII</span>
+                    <button class="btn-close" onclick="JarvisApp.closeVisionModal()">&times;</button>
+                </div>
+                <div class="camera-preview-container">
+                    <video id="visionVideo" autoplay playsinline></video>
+                    <div class="scanner-laser-line"></div>
+                    <div class="scanner-target-reticle"></div>
+                </div>
+                <div class="vision-footer">
+                    <button class="btn-cyan" onclick="JarvisApp.scanVisionObject()">SCAN TARGET</button>
+                    <div class="vision-result-text" id="visionResult">
+                        Align target reticle and tap 'SCAN TARGET' to analyze scene.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="hud-footer">
+            <span>STARK INDUSTRIES // AI PROTOCOL SUITE 2026</span>
+            <span class="voice-name" id="activeVoiceName">Voice: Default System</span>
+        </footer>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="js/sfx.js"></script>
+    <script src="js/visualizer.js"></script>
+    <script src="js/device-bridge.js"></script>
+    <script src="js/voice.js"></script>
+    <script src="js/jarvis.js"></script>
+</body>
+</html>
