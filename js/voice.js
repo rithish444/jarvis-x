@@ -14,6 +14,9 @@ class JarvisVoice {
         this.isSpeaking = false;
         this.gender = localStorage.getItem('jarvis_voice_gender') || 'female'; // Default: Girl Voice
 
+        this._lastSpokenText = '';
+        this._speakingEndTime = 0;
+
         this.currentLang = 'en'; // LOCKED: English only
         this.tamilVoice = null;
 
@@ -71,6 +74,17 @@ class JarvisVoice {
                     finalTranscript += event.results[i][0].transcript;
                 } else {
                     interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            const currentTranscript = (finalTranscript || interimTranscript).trim();
+
+            // Suppress displaying Jarvis's own spoken output in the User Input UI box
+            if (this.isSpeaking && this._lastSpokenText && currentTranscript) {
+                const cleanSpoken = this._lastSpokenText.toLowerCase().replace(/[^a-z0-9\s]/gi, '').trim();
+                const cleanTranscript = currentTranscript.toLowerCase().replace(/[^a-z0-9\s]/gi, '').trim();
+                if (cleanSpoken.includes(cleanTranscript) || cleanTranscript.includes(cleanSpoken)) {
+                    return;
                 }
             }
 
@@ -150,9 +164,38 @@ class JarvisVoice {
     handleFinalSpeech(text) {
         const now = Date.now();
         const normalizedText = text.trim().toLowerCase();
+        const cleanInput = normalizedText.replace(/[^a-z0-9\s]/gi, '').trim();
 
-        // RAPID RESPONSE: Immediately cancel any ongoing TTS so new command starts NOW
+        // 1. SELF-VOICE ECHO FILTER: Ignore speech if mic picks up Jarvis's own TTS output
+        if (this._lastSpokenText) {
+            const cleanSpoken = this._lastSpokenText.toLowerCase().replace(/[^a-z0-9\s]/gi, '').trim();
+            
+            const isSpokenOverlap = cleanInput.length > 0 && cleanSpoken.length > 0 && (
+                cleanSpoken.includes(cleanInput) ||
+                cleanInput.includes(cleanSpoken) ||
+                (cleanInput.length >= 6 && cleanSpoken.slice(0, 40).includes(cleanInput.slice(0, 15)))
+            );
+
+            if ((this.isSpeaking || (now - this._speakingEndTime < 1500)) && isSpokenOverlap) {
+                console.log("[VoiceEngine] Suppressed self-voice audio feedback loop:", text);
+                return;
+            }
+        }
+
+        // 2. WHILE SPEAKING FILTER: Ignore ambient speech unless user explicitly interrupts with wake word or stop command
         if (this.isSpeaking) {
+            const isExplicitInterrupt = normalizedText.includes('stop') || 
+                                        normalizedText.includes('shut up') || 
+                                        normalizedText.includes('quiet') || 
+                                        normalizedText.includes('cancel') ||
+                                        normalizedText.includes('hey jarvis') ||
+                                        normalizedText.includes('ok jarvis') ||
+                                        normalizedText.includes('jarvis');
+            if (!isExplicitInterrupt) {
+                console.log("[VoiceEngine] Suppressed audio input while Jarvis is speaking:", text);
+                return;
+            }
+            // User explicitly interrupted — cancel active speech
             this.synthesis.cancel();
             this.isSpeaking = false;
         }
@@ -286,6 +329,8 @@ class JarvisVoice {
             return;
         }
 
+        this._lastSpokenText = text;
+
         // Make sure voices are loaded
         if (!this.selectedVoice) {
             this.populateVoices();
@@ -317,6 +362,7 @@ class JarvisVoice {
 
         utterance.onend = () => {
             this.isSpeaking = false;
+            this._speakingEndTime = Date.now();
             if (arcCore) arcCore.classList.remove('speaking');
             if (this.isListening) {
                 if (this.onStateChange) this.onStateChange('listening');
@@ -332,6 +378,7 @@ class JarvisVoice {
                 console.warn('Speech Synthesis error:', err.error);
             }
             this.isSpeaking = false;
+            this._speakingEndTime = Date.now();
             if (arcCore) arcCore.classList.remove('speaking');
             if (onComplete) onComplete();
         };
