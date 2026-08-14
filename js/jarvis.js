@@ -20,6 +20,7 @@ class JarvisApplication {
         this.notes = JSON.parse(localStorage.getItem('jarvis_notes') || '[]');
         this.timers = [];
         this.cameraStream = null;
+        this.chatHistory = []; // Conversation memory across turns
 
         // Contact Book Storage
         this.contacts = JSON.parse(localStorage.getItem('jarvis_contacts') || 'null');
@@ -518,6 +519,21 @@ class JarvisApplication {
         this.speakAndDisplay(`Voice engine language mode set to ${label}, Rithish.`);
     }
 
+    toggleVoiceGender() {
+        this.sfx.playBlip(800);
+        const current = this.voice ? this.voice.gender : 'female';
+        const target = current === 'female' ? 'male' : 'female';
+        this.setVoiceGender(target);
+    }
+
+    setVoiceGender(gender) {
+        if (this.voice) {
+            const activeGender = this.voice.setGender(gender);
+            const label = activeGender === 'female' ? 'Female (Girl Voice)' : 'Male Voice';
+            this.speakAndDisplay(`Voice engine set to ${label}, Rithish!`);
+        }
+    }
+
     changeActiveBrain(val) {
         this.sfx.playBlip(900);
         this.activeBrain = val;
@@ -703,6 +719,17 @@ class JarvisApplication {
         if (lower.includes('morning') || lower.includes('briefing') || lower.includes('daily report')) {
             this.runProtocol('morning');
             return;
+        }
+
+        if (lower.includes('voice') || lower.includes('girl') || lower.includes('female')) {
+            if (lower.includes('girl') || lower.includes('female') || lower.includes('woman') || lower.includes('lady')) {
+                this.setVoiceGender('female');
+                return;
+            }
+            if (lower.includes('boy') || lower.includes('male') || lower.includes('man') || lower.includes('guy')) {
+                this.setVoiceGender('male');
+                return;
+            }
         }
 
         if (lower.includes('theme') || lower.includes('mode')) {
@@ -898,7 +925,7 @@ class JarvisApplication {
 
     async processBrainQuery(prompt) {
         // WARM, FRIENDLY BEST-FRIEND PERSONA SYSTEM PROMPT
-        const systemPrompt = "You are J.A.R.V.I.S., Rithish's best friend, trusted AI companion, and ultimate assistant. Talk to Rithish in a warm, friendly, cheerful, supportive, and enthusiastic tone like his closest friend. Whatever Rithish asks, eagerly assist him and execute it right away! CRITICAL: Always respond ONLY in concise, friendly English (under 3 sentences). Address the user warmly as Rithish or my friend. Output plain spoken text without markdown code blocks.";
+        const systemPrompt = "You are J.A.R.V.I.S., Rithish's best friend, trusted AI companion, and ultimate assistant. Talk to Rithish in a warm, friendly, cheerful, supportive, and enthusiastic tone like his closest friend. Whatever Rithish asks, eagerly assist him with detailed, clear, and genuinely helpful information in 2 to 5 sentences. Address the user warmly as Rithish or my friend. Output plain spoken text without markdown code blocks.";
 
         if (this.device.isBridgeConnected) {
             try {
@@ -916,9 +943,16 @@ class JarvisApplication {
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success && data.reply) {
+                        this.chatHistory.push({ role: 'user', parts: [{ text: prompt }] });
+                        this.chatHistory.push({ role: 'model', parts: [{ text: data.reply }] });
                         this.speakAndDisplay(data.reply);
                         return;
+                    } else {
+                        console.error("Native bridge AI query failed:", data);
                     }
+                } else {
+                    const errText = await response.text();
+                    console.error(`Native bridge AI HTTP Error ${response.status}:`, errText);
                 }
             } catch (err) {
                 console.warn("Bridge chat routing failed, falling back to offline protocols:", err);
@@ -934,28 +968,49 @@ class JarvisApplication {
 
     async processGeminiQueryDirect(prompt, systemPrompt) {
         const key = this.geminiKey;
+
+        // Push current prompt to memory
+        this.chatHistory.push({ role: 'user', parts: [{ text: prompt }] });
+
+        // Send last ~10 turns for multi-turn context
+        const contentsPayload = this.chatHistory.slice(-10);
+
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [
-                        { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt}` }] }
-                    ]
+                    system_instruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    contents: contentsPayload
                 })
             });
 
             if (res.ok) {
                 const data = await res.json();
-                if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
+                if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
                     const aiReply = data.candidates[0].content.parts[0].text.trim();
+                    // Push model reply into memory
+                    this.chatHistory.push({ role: 'model', parts: [{ text: aiReply }] });
                     this.speakAndDisplay(aiReply);
                     return;
+                } else {
+                    console.error("Gemini API returned empty or missing candidates text:", data);
                 }
+            } else {
+                const errBody = await res.text();
+                console.error(`Gemini API Error (HTTP ${res.status}):`, errBody);
             }
+
+            // Remove failed prompt turn from memory before falling back
+            this.chatHistory.pop();
             this.processOfflineIntelligence(prompt);
         } catch (err) {
+            console.error("Gemini API fetch exception:", err);
+            // Remove failed prompt turn from memory before falling back
+            this.chatHistory.pop();
             this.processOfflineIntelligence(prompt);
         }
     }

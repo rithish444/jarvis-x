@@ -12,6 +12,7 @@ class JarvisVoice {
         this.selectedVoice = null;
         this.isListening = false;
         this.isSpeaking = false;
+        this.gender = localStorage.getItem('jarvis_voice_gender') || 'female'; // Default: Girl Voice
 
         this.currentLang = 'en'; // LOCKED: English only
         this.tamilVoice = null;
@@ -32,6 +33,13 @@ class JarvisVoice {
         if (this.recognition) {
             this.recognition.lang = 'en-US';
         }
+    }
+
+    setGender(gender) {
+        this.gender = gender === 'male' ? 'male' : 'female';
+        localStorage.setItem('jarvis_voice_gender', this.gender);
+        this.populateVoices();
+        return this.gender;
     }
 
     // 1. SPEECH RECOGNITION (STT)
@@ -194,25 +202,13 @@ class JarvisVoice {
     initSpeechSynthesis() {
         if (!this.synthesis) return;
 
-        const populateVoices = () => {
-            const voices = this.synthesis.getVoices();
-            // Look for British male voice preferred for JARVIS English
-            this.selectedVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('UK') || v.name.includes('British') || v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Google UK English Male')))
-                || voices.find(v => v.lang.startsWith('en-US'))
-                || voices[0];
-
-            // Look for Tamil voice if present
-            this.tamilVoice = voices.find(v => v.lang.startsWith('ta') || v.name.toLowerCase().includes('tamil')) || null;
-
-            const voiceLabel = document.getElementById('activeVoiceName');
-            if (voiceLabel) {
-                voiceLabel.innerText = `Voice: ${this.selectedVoice ? this.selectedVoice.name : 'Default'}${this.tamilVoice ? ' + Tamil Core' : ''}`;
-            }
+        const handleVoicesChanged = () => {
+            this.populateVoices();
         };
 
-        populateVoices();
+        handleVoicesChanged();
         if (this.synthesis.onvoiceschanged !== undefined) {
-            this.synthesis.onvoiceschanged = populateVoices;
+            this.synthesis.onvoiceschanged = handleVoicesChanged;
         }
 
         // Chrome bug fix: speech synthesis freezes after ~15s of inactivity
@@ -223,10 +219,76 @@ class JarvisVoice {
         }, 10000);
     }
 
+    populateVoices() {
+        if (!this.synthesis) return;
+        const voices = this.synthesis.getVoices();
+        if (!voices || voices.length === 0) return;
+
+        const femaleKeywords = [
+            'female', 'zira', 'samantha', 'victoria', 'karen', 'fiona', 'eva', 
+            'jenny', 'aria', 'sonia', 'moira', 'veena', 'google uk english female', 
+            'google us english female', 'alice', 'amanda', 'clara', 'sara', 'emily', 
+            'serena', 'stephanie', 'girl', 'woman', 'natural female', 'natural',
+            'helena', 'catherine', 'hazel', 'susan', 'linda', 'lisa', 'mary'
+        ];
+
+        const maleKeywords = [
+            'male', 'david', 'mark', 'george', 'alex', 'daniel', 'richard', 
+            'james', 'john', 'paul', 'google us english', 'google uk english male',
+            'microsoft david', 'microsoft mark'
+        ];
+
+        if (this.gender === 'female') {
+            // Priority 1: English female voice
+            this.selectedVoice = voices.find(v => {
+                const name = v.name.toLowerCase();
+                return v.lang.startsWith('en') && femaleKeywords.some(k => name.includes(k));
+            })
+            // Priority 2: Female voice in any language
+            || voices.find(v => {
+                const name = v.name.toLowerCase();
+                return femaleKeywords.some(k => name.includes(k));
+            })
+            // Priority 3: English voice not explicitly male
+            || voices.find(v => {
+                const name = v.name.toLowerCase();
+                return v.lang.startsWith('en') && !maleKeywords.some(m => name.includes(m));
+            })
+            // Fallback
+            || voices.find(v => v.lang.startsWith('en'))
+            || voices[0];
+        } else {
+            // Male voice
+            this.selectedVoice = voices.find(v => {
+                const name = v.name.toLowerCase();
+                return v.lang.startsWith('en') && maleKeywords.some(k => name.includes(k));
+            })
+            || voices.find(v => v.lang.startsWith('en'))
+            || voices[0];
+        }
+
+        const voiceLabel = document.getElementById('activeVoiceName');
+        if (voiceLabel) {
+            const genderTag = this.gender === 'female' ? '👧 Girl Voice' : '👦 Boy Voice';
+            voiceLabel.innerText = `Voice: ${genderTag} (${this.selectedVoice ? this.selectedVoice.name : 'Default'})`;
+        }
+
+        const btn = document.getElementById('voiceGenderBtn');
+        if (btn) {
+            btn.innerText = this.gender === 'female' ? '👧 GIRL VOICE' : '👦 BOY VOICE';
+            btn.classList.toggle('active', this.gender === 'female');
+        }
+    }
+
     speak(text, onComplete) {
         if (!this.synthesis) {
             if (onComplete) onComplete();
             return;
+        }
+
+        // Make sure voices are loaded
+        if (!this.selectedVoice) {
+            this.populateVoices();
         }
 
         // Instantly cancel previous speech — no waiting
@@ -234,11 +296,16 @@ class JarvisVoice {
 
         const utterance = new SpeechSynthesisUtterance(text);
 
-        // ENGLISH ONLY — always use English voice
         if (this.selectedVoice) utterance.voice = this.selectedVoice;
         utterance.lang = 'en-US';
-        utterance.rate = 1.2;  // Faster English — crisp & rapid
-        utterance.pitch = 0.95;
+
+        if (this.gender === 'female') {
+            utterance.pitch = 1.3;  // Bright, cheerful, feminine girl voice tone
+            utterance.rate = 1.05;  // Smooth and clear speed
+        } else {
+            utterance.pitch = 0.95; // Deeper male tone
+            utterance.rate = 1.0;
+        }
 
         const arcCore = document.getElementById('arcCoreBtn');
 

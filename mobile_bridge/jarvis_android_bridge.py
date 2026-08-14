@@ -79,7 +79,7 @@ class JarvisBridgeHandler(BaseHTTPRequestHandler):
                 brain = payload.get('brain')  # 'gemini', 'claude', 'chatgpt'
                 api_key = payload.get('apiKey')
                 prompt = payload.get('prompt')
-                default_sys = "You are J.A.R.V.I.S., Rithish's best friend, trusted AI companion, and ultimate assistant. Talk to Rithish in a warm, friendly, cheerful, supportive, and enthusiastic tone like his closest friend. Whatever Rithish asks, eagerly assist him and execute it right away! CRITICAL: Always respond ONLY in concise, friendly English (under 3 sentences). Address the user warmly as Rithish or my friend. Output plain spoken text without markdown code blocks."
+                default_sys = "You are J.A.R.V.I.S., Rithish's best friend, trusted AI companion, and ultimate assistant. Talk to Rithish in a warm, friendly, cheerful, supportive, and enthusiastic tone like his closest friend. Whatever Rithish asks, eagerly assist him with detailed, clear, and genuinely helpful information in 2 to 5 sentences. Address the user warmly as Rithish or my friend. Output plain spoken text without markdown code blocks."
                 system_prompt = payload.get('systemPrompt') or default_sys
                 
                 result = self.call_ai_api(brain, api_key, prompt, system_prompt)
@@ -194,13 +194,17 @@ class JarvisBridgeHandler(BaseHTTPRequestHandler):
 
         try:
             if brain == 'gemini':
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
                 headers = {"Content-Type": "application/json"}
                 body = {
+                    "system_instruction": {
+                        "parts": [{ "text": system_prompt }]
+                    },
                     "contents": [
                         {
+                            "role": "user",
                             "parts": [
-                                { "text": f"{system_prompt}\n\nUser: {prompt}" }
+                                { "text": prompt }
                             ]
                         }
                     ]
